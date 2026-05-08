@@ -1,0 +1,62 @@
+
+services:
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: echoinsight
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+
+  backend:
+    build: ./apps/server
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    volumes:
+      - ./apps/server:/app
+      - echoinsight_storage:/app/storage
+    environment:
+      - DATABASE_URL=postgresql://admin:password@db/echoinsight
+      - REDIS_URL=redis://redis:6379/0
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-mock}
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+      - redis
+
+  worker:
+    build: ./apps/server
+    command: celery -A worker.celery_app worker --loglevel=info
+    volumes:
+      - ./apps/server:/app
+      - echoinsight_storage:/app/storage
+    environment:
+      - DATABASE_URL=postgresql://admin:password@db/echoinsight
+      - REDIS_URL=redis://redis:6379/0
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-mock}
+    depends_on:
+      - redis
+
+  web:
+    build: ./apps/web
+    environment:
+      - BACKEND_URL=http://backend:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    command: tunnel --no-autoupdate --url http://web:3000
+    depends_on:
+      - web
+
+volumes:
+  echoinsight_storage:

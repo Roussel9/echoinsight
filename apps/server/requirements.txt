@@ -1,0 +1,13 @@
+fastapi
+uvicorn
+celery
+redis
+openai
+python-multipart
+sqlalchemy
+psycopg2-binary
+pydantic
+pydantic-settings
+yt-dlp
+pypdf
+faster-whisper
